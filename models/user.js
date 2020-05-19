@@ -35,36 +35,31 @@ class User extends Model {
     const dao = new DAO({
       sequelize: sequelize
     });
-    const projects = await dao.getAllData(this.id,search);
-    let departments = {};
 
-    projects.forEach( project => {
-      if (project.milestones.length > 0) {
-        if (Array.isArray(departments[project.departmentName])) {
-          departments[project.departmentName].push(project);
-        } else {
-          departments[project.departmentName] = [project];
-        }
+    const projects = await dao.getAllData(this.id, search);
+    const departments = projects.reduce((departments, project) => {
+      if(!departments.includes(project.departmentName)) {
+        departments.push(project.departmentName);
       }
-    });
 
-    const departmentObjects = await this.getDepartments(); 
-    let result = [];
-    departmentObjects .forEach( (department) => {
-      if (departments[department.name]) {
-        department.projects = departments[department.name];
-        department.dataValues.projects = departments[department.name];
-        result.push(department);
-      }
-    });
+      return departments;
+    }, []);
 
+    const result = [];
+    departments.forEach(departmentName => {
+      const projectsForDepartment = projects.filter(project => {
+        const hasMilestones = project.milestones && project.milestones.length;
+        const matchesDepartment = project.departmentName === departmentName;
 
-    // sort milestones inside projects
-    result.forEach(departments => {
-      departments.projects.forEach(projects => {
-        projects.milestones = projects.milestones
-          .sort((a, b) => moment(a.date, 'DD/MM/YYYY').valueOf() - moment(b.date, 'DD/MM/YYYY').valueOf());
+        return hasMilestones && matchesDepartment;
       });
+
+      if (projectsForDepartment.length) {
+        result.push({
+          name: departmentName,
+          projects: projectsForDepartment
+        });
+      }
     });
 
     return result;
